@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 2.6)
+set(SOURCES color.cpp tiles.cpp units.cpp map.cpp player.cpp buildings.cpp ai.cpp ui.cpp main.cpp)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -lGLEW")
+add_executable(launch ${SOURCES})
+find_package(GLUT)
+find_package(OpenGL)
+include_directories( ${OPENGL_INCLUDE_DIRS}  ${GLUT_INCLUDE_DIRS} )
+target_link_libraries(launch ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ) 
