@@ -19,3 +19,4 @@ extern const Color redColor;
 extern const Color blueColor;
 extern const Color magentaColor;
 extern const Color crimsonColor;
+extern const Color ultraLightYellowColor;

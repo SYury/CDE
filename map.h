@@ -2,7 +2,7 @@
 
 #include "other.h"
 #include "tiles.h"
-#include "units.h"
+#include "army.h"
 #include "buildings.h"
 
 class Map{
@@ -10,7 +10,7 @@ class Map{
 	public:
 	int W, H;
 	std::vector<std::vector<Tile> > tiles;
-	std::vector<std::vector<Unit*> > units;
+	std::vector<std::vector<Army*> > units;
 	std::vector<std::vector<Base*> > bases;
 	std::vector<std::vector<Village*> > villages;
 	std::vector<std::vector<Town*> > towns;
@@ -45,6 +45,7 @@ class Map{
 extern void loadMap(FILE * fl);
 extern void saveMap(FILE * fl);
 
-extern void moveUnit(Unit* who, int dx, int dy);
-extern void attackUnit(Unit * atk, Unit * def);
-extern void attackBase(Unit * atk, Base * def);
+extern void moveArmy(Army * who, int dx, int dy);
+extern void attackArmy(Army * atk, Army * def);
+extern void attackBase(Army * atk, Base * def);
+extern bool canUpgrade(int x, int y);

@@ -14,7 +14,7 @@ void makeMove(int id){
 			if(map->bases[i][j] != nullptr && map->bases[i][j]->getOwner() != id)
 				if(abs(base->getX() - closest_x) + abs(base->getY() - closest_y) > abs(base->getX() - i) + abs(base->getY() - j)){closest_x = i; closest_y = j;}
 	while(player[id].food >= 1 && player[id].gold >= 25){
-		Unit * who = base->hireUnit(player[id].factory->getCavalry(id), 0, 0);
+		Army * who = base->hireUnit(player[id].factory->getCavalry(id), 0, 0);
 		if(who == nullptr)break;
 	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "player.h"
+#include "army.h"
 
 class Building{
 	protected:
@@ -22,11 +23,12 @@ class Base : public Building{
 	int hp = 300;
 	public:
 	Base(int _x, int _y):Building(_x, _y){}
+	~Base(){}
 	int getHp()const{return hp;}
 	void addHp(int cnt){hp += cnt;}
 	void setHp(int val){hp = val;}
 	char getIcon()const{return 'B';}
-	Unit * hireUnit(Unit * who, int dx, int dy)const;
+	Army * hireUnit(Unit * who, int dx, int dy)const;
 };
 
 class Village : public Building{

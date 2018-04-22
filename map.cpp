@@ -2,7 +2,7 @@
 #include "random.h"
 
 void loadMap(FILE * fl){
-	//TODO
+	//TODO: this must be rewritten
 	if(fl == NULL)die("Attempted to load from NULL");
 	Map *map = (new Map)->Instance();
 	map->clear();
@@ -41,7 +41,8 @@ void loadMap(FILE * fl){
 			Unit * who = player[fraction].factory->unitById(fraction, (unit_type_id)type);
 			who->setHealth(health);
 			who->setMP(move_pts);
-			map->units[i][j] = who;
+			Army * ar = (Army*)(new UnitInSquad(who));;
+			map->units[i][j] = ar;
 		}
 	}
 	for(int i = 0; i < map->H; i++){
@@ -89,11 +90,11 @@ void saveMap(FILE * fl){
 	Map *map = (new Map)->Instance();
 }
 
-void moveUnit(Unit* who, int dx, int dy){
+void moveArmy(Army * who, int dx, int dy){
 	Map *map = (new Map)->Instance();
 	int x = who->getX() + dx, y = who->getY() + dy;
 	if(who->getMP() == 0)return;
-	if(!map->inMap(x, y))die("Unit tried to move out of the map!");
+	if(!map->inMap(x, y))die("Army tried to move out of the map!");
 	if(map->units[x][y] != nullptr)return;
 	if(map->bases[x][y] != nullptr)return;
 	if(map->villages[x][y] != nullptr)map->villages[x][y]->capture(who->getFraction());
@@ -105,29 +106,24 @@ void moveUnit(Unit* who, int dx, int dy){
 	map->units[who->getX()][who->getY()] = who;
 }
 
-void attackUnit(Unit * atk, Unit * def){
+void attackArmy(Army * atk, Army * def){
 	Map *map = (new Map)->Instance();
-	auto abonus = atk->getTileAttackBonus(map->tiles[atk->getX()][atk->getY()].getId());
-	auto dbonus = def->getTileDefenceBonus(map->tiles[atk->getX()][atk->getY()].getId());
-	Random gen;
-	int dmg = gen.get(atk->getLD(), atk->getHD());
-	double raw_dmg = dmg * abonus/double(dbonus);
-	dmg = (int)(round(raw_dmg) + 1e-8);
-	def->addHealth(-dmg);
-	if(def->getHealth() <= 0){
-		def->onDeath();
+	if(atk->getFraction() == def->getFraction())
+		return;
+	int dmg = atk->attack(map->tiles[atk->getX()][atk->getY()].getId());
+	if(!def->defend(dmg, map->tiles[def->getX()][def->getY()].getId())){
 		map->units[def->getX()][def->getY()] = nullptr;
 		delete def;
 	}
 }
 
-void attackBase(Unit * atk, Base * def){
+void attackBase(Army * atk, Base * def){
 	Map *map = (new Map)->Instance();
-	auto abonus = atk->getTileAttackBonus(map->tiles[atk->getX()][atk->getY()].getId());
+	if(atk->getFraction() == def->getOwner())
+		return;
 	auto dbonus = 80;
-	Random gen;
-	int dmg = gen.get(atk->getLD(), atk->getHD());
-	double raw_dmg = dmg * abonus/double(dbonus);
+	int dmg = atk->attack(map->tiles[atk->getX()][atk->getY()].getId());
+	double raw_dmg = dmg/double(dbonus);
 	dmg = (int)(round(raw_dmg) + 1e-8);
 	def->addHp(-dmg);
 	if(def->getHp() <= 0){
@@ -139,4 +135,17 @@ void attackBase(Unit * atk, Base * def){
 		map->bases[def->getX()][def->getY()] = nullptr;
 		delete def;
 	}
+}
+
+bool canUpgrade(int x, int y){
+	Map *map = (new Map)->Instance();
+	int fr = map->units[x][y]->getFraction();
+	for(int i = x - 3; i <= x + 3; i++){
+		for(int j = y - 3; j <= y + 3; j++){
+			if(!map->inMap(i, j))continue;
+			if(map->units[i][j] != nullptr && map->units[i][j]->getFraction() != fr)
+				return false;
+		}
+	}
+	return true;
 }

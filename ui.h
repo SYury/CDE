@@ -14,7 +14,12 @@ enum mode_id{
 	win_mode,
 	hire_mode,
 	hire_dir_mode,
-	tile_info_mode
+	tile_info_mode,
+	merge_mode,
+	upgrade_mode,
+	split_mode,
+	split_dir_mode,
+	squad_manage_mode
 };
 
 class GameWindow{

@@ -27,26 +27,20 @@ class Unit{
 	int attack_range;
 	int low_dmg, high_dmg;
 	int gold_cost, food_cost;
-	int x, y;
 	public:
 	Unit(char _icon, std::string _name, std::vector<std::string> _description, unit_type_id _unit_type, int _fraction, int _health, int _move_pts, int _attack_range, int _low_dmg, int _high_dmg, int _gold_cost, int _food_cost):icon(_icon),name(_name),description(_description),unit_type(_unit_type),fraction(_fraction),health(_health),move_pts(_move_pts),attack_range(_attack_range),low_dmg(_low_dmg),high_dmg(_high_dmg),gold_cost(_gold_cost),food_cost(_food_cost){}
+	~Unit(){}
 	virtual int getTileAttackBonus(tile_id id)const = 0;
 	virtual int getTileDefenceBonus(tile_id id)const = 0;
 	virtual void restoreMP() = 0;
 	std::string getName()const{return name;}
 	char getIcon()const{return icon;}
-	int getX()const{return x;}
-	int getY()const{return y;}
 	int getMP()const{return move_pts;}
 	int getAR()const{return attack_range;}
 	int getFraction()const{return fraction;}
 	int getHealth()const{return health;}
 	int getLD()const{return low_dmg;}
 	int getHD()const{return high_dmg;}
-	void addX(int cnt){x += cnt;}
-	void addY(int cnt){y += cnt;}
-	void setX(int val){x = val;}
-	void setY(int val){y = val;}
 	void addMP(int cnt){move_pts += cnt;}
 	void setMP(int val){move_pts = val;}
 	void setFraction(int fr){fraction = fr;}

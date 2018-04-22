@@ -18,6 +18,10 @@ int cornerX, cornerY;
 int selectX, selectY;
 int dX, dY;
 int playerId;
+std::string userInput;
+
+std::vector<char> toSplit;
+int toPush;
 
 const int xDelta = 9, yDelta = 15;
 
@@ -164,7 +168,7 @@ void drawField(){
 		for(int i = cornerX; i < cornerX + h; i++){
 			for(int j = cornerY; j < cornerY + w; j++){
 				if(map->units[i][j] != nullptr){
-					printChar(map->units[i][j]->getIcon(), playerColorById(map->units[i][j]->getFraction()));
+					printChar('A', playerColorById(map->units[i][j]->getFraction()));
 					xPos += xDelta;
 					continue;
 				}
@@ -197,7 +201,7 @@ void drawField(){
 		glutSwapBuffers();
 		return;
 	}
-	if(window->getCurrentMode() == select_mode || window->getCurrentMode() == unit_move_mode || window->getCurrentMode() == unit_attack_mode || window->getCurrentMode() == hire_dir_mode){
+	if(window->getCurrentMode() == select_mode || window->getCurrentMode() == unit_move_mode || window->getCurrentMode() == unit_attack_mode || window->getCurrentMode() == hire_dir_mode || window->getCurrentMode() == merge_mode || window->getCurrentMode() == split_dir_mode){
 		int w = std::min(window->getMapW(), map->W - cornerY);
 		int h = std::min(window->getMapH(), map->H - cornerX);
 		int defaultX = xPos;
@@ -205,6 +209,8 @@ void drawField(){
 		if(window->getCurrentMode() == unit_move_mode)printString("Move mode", whiteColor);
 		if(window->getCurrentMode() == unit_attack_mode)printString("Attack mode", whiteColor);
 		if(window->getCurrentMode() == hire_dir_mode)printString("Choose the direction for unit to spawn", whiteColor);
+		if(window->getCurrentMode() == merge_mode)printString("Choose the direction to merge with", whiteColor);
+		if(window->getCurrentMode() == split_dir_mode)printString("Choose the direction for unit to split", whiteColor);
 		yPos -= yDelta;
 		printString("This is your ", whiteColor);
 		xPos += xDelta * strlen("This is your ");
@@ -216,26 +222,26 @@ void drawField(){
 				bool overrideCol = window->getCurrentMode() != hire_dir_mode && selectX == i && selectY == j;
 				bool ov2 = window->getCurrentMode() == unit_attack_mode && selectX + dX == i && selectY + dY == j;
 				if(map->units[i][j] != nullptr){
-					printChar(map->units[i][j]->getIcon(), ov2 ? crimsonColor : (overrideCol ? magentaColor : playerColorById(map->units[i][j]->getFraction())));
+					printChar('A', ov2 ? ultraLightYellowColor : (overrideCol ? magentaColor : playerColorById(map->units[i][j]->getFraction())));
 					xPos += xDelta;
 					continue;
 				}
 				if(map->bases[i][j] != nullptr){
-					printChar(map->bases[i][j]->getIcon(), ov2 ? crimsonColor : (overrideCol ? magentaColor : playerColorById(map->bases[i][j]->getOwner())));
+					printChar(map->bases[i][j]->getIcon(), ov2 ? ultraLightYellowColor : (overrideCol ? magentaColor : playerColorById(map->bases[i][j]->getOwner())));
 					xPos += xDelta;
 					continue;
 				}
 				if(map->villages[i][j] != nullptr){
-					printChar(map->villages[i][j]->getIcon(), ov2 ? crimsonColor : (overrideCol ? magentaColor : playerColorById(map->villages[i][j]->getOwner())));
+					printChar(map->villages[i][j]->getIcon(), ov2 ? ultraLightYellowColor : (overrideCol ? magentaColor : playerColorById(map->villages[i][j]->getOwner())));
 					xPos += xDelta;
 					continue;
 				}
 				if(map->towns[i][j] != nullptr){
-					printChar(map->towns[i][j]->getIcon(), ov2 ? crimsonColor : (overrideCol ? magentaColor : playerColorById(map->towns[i][j]->getOwner())));
+					printChar(map->towns[i][j]->getIcon(), ov2 ? ultraLightYellowColor : (overrideCol ? magentaColor : playerColorById(map->towns[i][j]->getOwner())));
 					xPos += xDelta;
 					continue;
 				}
-				printChar(map->tiles[i][j].getIcon(), ov2 ? crimsonColor : (overrideCol ? magentaColor : map->tiles[i][j].getColor()));
+				printChar(map->tiles[i][j].getIcon(), ov2 ? ultraLightYellowColor : (overrideCol ? magentaColor : map->tiles[i][j].getColor()));
 				xPos += xDelta;
 			}
 			xPos = defaultX;
@@ -276,19 +282,167 @@ void drawField(){
 		glutSwapBuffers();
 		return;
 	}
+	if(window->getCurrentMode() == split_mode){
+		printString("Choose squads or units to split to the new army", whiteColor);
+		yPos -= yDelta;
+		if(dX == -1 && dY == 0)printString("Direction: UP", whiteColor);
+		if(dX == 1 && dY == 0)printString("Direction: DOWN", whiteColor);
+		if(dX == 0 && dY == -1)printString("Direction: LEFT", whiteColor);
+		if(dX == 0 && dY == 1)printString("Direction: RIGHT", whiteColor);
+		yPos -= 2 * yDelta;
+		Army * what = map->units[selectX][selectY];
+		int id = 1;
+		auto outSquad = [&yPos, &id, &toSplit](Squad * s){
+			std::queue<Squad*> q;
+			std::queue<int> parent;
+			std::queue<bool> removed;
+			q.push(s);
+			parent.push(0);
+			removed.push(false);
+			while(!q.empty()){
+				Squad * curr = q.front();
+				int p = parent.front();
+				bool rm = removed.front();
+				q.pop();
+				parent.pop();
+				removed.pop();
+				auto col = (!rm && (toSplit.empty() || !toSplit[id])) ? whiteColor : lightBlueColor;
+				if(curr->isUnit()){
+					UnitInSquad * u = (UnitInSquad*)curr;
+					printString(std::to_string(id) + "| Unit " + u->getName() + " in " + (p == 0 ? "initial army" : ("squad " + std::to_string(p))), col);
+					yPos -= yDelta;
+					++id;
+				}
+				else{
+					printString(std::to_string(id) + "| Squad in " + (p == 0 ? "initial army" : ("squad " + std::to_string(p))), col);
+					yPos -= yDelta;
+					for(auto it = curr->begin(); it != curr->end(); it++){
+						q.push(*it);
+						parent.push(id);
+						removed.push(!(!rm && (toSplit.empty() || !toSplit[id])));
+					}
+					++id;
+				}
+			}
+		};
+		for(auto it = what->begin(); it != what->end(); it++)
+				outSquad(*it);
+		if(toSplit.empty()){
+			toSplit.resize(id);
+			toSplit.assign(id, false);
+		}
+		yPos -= yDelta;
+		printString("Enter squad number:", whiteColor);
+		yPos -= yDelta;
+		printString(userInput, lightBlueColor);
+		yPos -= yDelta;
+		glutSwapBuffers();
+	}
+	if(window->getCurrentMode() == squad_manage_mode){
+		printString("Choose squad:", whiteColor);
+		yPos -= 2 * yDelta;
+		Army * what = map->units[selectX][selectY];
+		int id = 1;
+		auto outSquad = [&yPos, &id, &toSplit](Squad * s){
+			std::queue<Squad*> q;
+			std::queue<int> parent;
+			std::queue<bool> removed;
+			q.push(s);
+			parent.push(0);
+			removed.push(false);
+			while(!q.empty()){
+				Squad * curr = q.front();
+				int p = parent.front();
+				bool rm = removed.front();
+				q.pop();
+				parent.pop();
+				removed.pop();
+				auto col = (!rm && (toSplit.empty() || !toSplit[id])) ? whiteColor : lightBlueColor;
+				if(curr->isUnit()){
+					UnitInSquad * u = (UnitInSquad*)curr;
+					printString(std::to_string(id) + "| Unit " + u->getName() + " in " + (p == 0 ? "initial army" : ("squad " + std::to_string(p))), col);
+					yPos -= yDelta;
+					++id;
+				}
+				else{
+					printString(std::to_string(id) + "| Squad in " + (p == 0 ? "initial army" : ("squad " + std::to_string(p))), col);
+					yPos -= yDelta;
+					for(auto it = curr->begin(); it != curr->end(); it++){
+						q.push(*it);
+						parent.push(id);
+						removed.push(!(!rm && (toSplit.empty() || !toSplit[id])));
+					}
+					++id;
+				}
+			}
+		};
+		for(auto it = what->begin(); it != what->end(); it++)
+				outSquad(*it);
+		yPos -= yDelta;
+		if(toPush != -1){
+			printString("Choosing squad to make " + std::to_string(toPush) + " a child of", whiteColor);
+			yPos -= yDelta;
+		}
+		printString("Enter squad number:", whiteColor);
+		yPos -= yDelta;
+		printString(userInput, lightBlueColor);
+		yPos -= yDelta;
+		glutSwapBuffers();
+	}
+	if(window->getCurrentMode() == upgrade_mode){
+		printString("Enhance army", whiteColor);
+		yPos -= 2 * yDelta;
+		printString("a| Enhance power for 100 gold", whiteColor);
+		yPos -= yDelta;
+		printString("b| Enhance defence for 100 gold", whiteColor);
+		yPos -= yDelta;
+		glutSwapBuffers();
+		return;
+	}
 	if(window->getCurrentMode() == tile_info_mode){
 		printString("Info mode", whiteColor);
 		yPos -= 2*yDelta;
 		printString("Tile position: " + std::to_string(selectX) + "X " + std::to_string(selectY) + "Y", whiteColor);
 		yPos -= 2*yDelta;
 		if(map->units[selectX][selectY] != nullptr){
-			printString("This tile has unit: " + map->units[selectX][selectY]->getName(), whiteColor);
+			printString("This tile has an army:", whiteColor);
 			yPos -= yDelta;
 			printString("Owner's color:", whiteColor);
 			yPos -= yDelta;
-			printString("XXXXXXXXXXXX", playerColorById(map->units[selectX][selectY]->getFraction()));
+			Army * what = map->units[selectX][selectY];
+			printString("XXXXXXXXXXXX", playerColorById(what->getFraction()));
 			yPos -= yDelta;
-			printString("Unit stats: " + std::to_string(map->units[selectX][selectY]->getHealth()) + " health " + std::to_string(map->units[selectX][selectY]->getMP()) + " movement points", whiteColor);
+			int id = 1;
+			auto outSquad = [&yPos, &id](Squad * s){
+				std::queue<Squad*> q;
+				std::queue<int> parent;
+				q.push(s);
+				parent.push(0);
+				while(!q.empty()){
+					Squad * curr = q.front();
+					int p = parent.front();
+					q.pop();
+					parent.pop();
+					if(curr->isUnit()){
+						UnitInSquad * u = (UnitInSquad*)curr;
+						printString("Unit " + u->getName() + " in " + (p == 0 ? "initial army" : ("squad " + std::to_string(p))), whiteColor);
+						yPos -= yDelta;
+						printString("This unit has " + std::to_string(u->getHealth()) + " health points and " + std::to_string(u->getMP()) + " movement points left",lightBlueColor); 
+						yPos -= yDelta;
+					}
+					else{
+						printString("Squad " + std::to_string(id) + " in " + (p == 0 ? "initial army" : ("squad " + std::to_string(p))), whiteColor);
+						yPos -= yDelta;
+						for(auto it = curr->begin(); it != curr->end(); it++){
+							q.push(*it);
+							parent.push(id);
+						}
+						++id;
+					}
+				}
+			};
+			for(auto it = what->begin(); it != what->end(); it++)
+				outSquad(*it);
 			yPos -= 2 * yDelta;
 		}
 		if(map->bases[selectX][selectY] != nullptr){
@@ -446,6 +600,22 @@ void handleKey(unsigned char key, int x, int y){
 			window->setCurrentMode(tile_info_mode);
 			glutPostRedisplay();
 		}
+		if(key == 'g'){
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0){window->setCurrentMode(merge_mode);}
+			glutPostRedisplay();
+		}
+		if(key == 'e'){
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0 && canUpgrade(selectX, selectY)){window->setCurrentMode(upgrade_mode);}
+			glutPostRedisplay();
+		}
+		if(key == 'p'){
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0){dX = dY = 0; window->setCurrentMode(split_dir_mode);}
+			glutPostRedisplay();
+		}
+		if(key == 'q'){
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0){dX = dY = 0; toPush = -1; window->setCurrentMode(squad_manage_mode);}
+			glutPostRedisplay();
+		}
 		if(key == ' '){
 			++turnId;
 			aiTurn();
@@ -472,7 +642,7 @@ void handleKey(unsigned char key, int x, int y){
 		}
 		if(key == 13){
 			if(map->units[selectX + dX][selectY + dY] == nullptr && map->bases[selectX + dX][selectY + dY] == nullptr)return;
-			if(map->units[selectX + dX][selectY + dY] != nullptr)attackUnit(map->units[selectX][selectY], map->units[selectX + dX][selectY + dY]);
+			if(map->units[selectX + dX][selectY + dY] != nullptr)attackArmy(map->units[selectX][selectY], map->units[selectX + dX][selectY + dY]);
 			else attackBase(map->units[selectX][selectY], map->bases[selectX + dX][selectY + dY]);
 			window->setCurrentMode(select_mode);
 			glutPostRedisplay();
@@ -507,6 +677,236 @@ void handleKey(unsigned char key, int x, int y){
 		}
 		return;
 	}
+	if(window->getCurrentMode() == split_mode){
+		if(key == 27){
+			window->setCurrentMode(split_dir_mode);
+			dX = dY = 0;
+			toSplit.clear();
+			userInput = "";
+			glutPostRedisplay();
+		}
+		if(key >= '0' && key <= '9'){
+			userInput += key;
+			glutPostRedisplay();
+		}
+		if(key == 13){
+			int id = atoi(userInput.c_str());
+			if(id < (int)toSplit.size())
+				toSplit[id] = true;
+			userInput = "";
+			glutPostRedisplay();
+		}
+		if(key == 'p'){
+			int id = 1;
+			Army * splitted = new Army;
+			Army * init = map->units[selectX][selectY];
+			std::vector<Squad*> was;
+			was.push_back(init);
+			auto splitSquad = [&was, &id, &splitted, &toSplit, &init](Squad * s){
+				std::queue<Squad*> q;
+				std::queue<int> parent;
+				std::queue<bool> removed;
+				q.push(s);
+				parent.push(0);
+				removed.push(false);
+				while(!q.empty()){
+					Squad * curr = q.front();
+					int p = parent.front();
+					bool rm = removed.front();
+					was.push_back(curr);
+					q.pop();
+					parent.pop();
+					removed.pop();
+					if(toSplit[id] && !rm){
+						was[p]->removeSquad(curr);
+						splitted->addSquad(curr);
+						rm = true;
+					}
+					++id;
+					if(!curr->isUnit()){
+						for(auto it = curr->begin(); it != curr->end(); it++){
+							q.push(*it);
+							parent.push(id - 1);
+							removed.push(rm);
+						}
+					}
+				}
+			};
+			std::vector<Squad*> check;
+			for(auto it = map->units[selectX][selectY]->begin(); it != map->units[selectX][selectY]->end(); it++)
+				check.push_back(*it);
+			for(auto s : check)
+				splitSquad(s);
+			check.clear();
+			if(!splitted->empty()){
+				Army * what = map->units[selectX + dX][selectY + dY];
+				if(what == nullptr)
+					map->units[selectX + dX][selectY + dY] = splitted;
+				else
+					what->addSquad(splitted);
+			}
+			if(!cleanSquad(init, nullptr))
+				map->units[selectX][selectY] = nullptr;
+			window->setCurrentMode(select_mode);
+			glutPostRedisplay();
+		}
+		if(key == 8){
+			if(!userInput.empty())userInput.pop_back();
+			glutPostRedisplay();
+		}
+		return;
+	}
+	if(window->getCurrentMode() == squad_manage_mode){
+		if(key == 27){
+			window->setCurrentMode(select_mode);
+			userInput = "";
+			glutPostRedisplay();
+		}
+		if(key >= '0' && key <= '9'){
+			userInput += key;
+			glutPostRedisplay();
+		}
+		if(key == '-'){
+			int must_remove = atoi(userInput.c_str());
+			userInput = "";
+			int id = 1;
+			Army * init = map->units[selectX][selectY];
+			std::vector<Squad*> was;
+			was.push_back(init);
+			auto upSquad = [&was, &id, &must_remove, &init](Squad * s)->bool{
+				std::queue<Squad*> q;
+				std::queue<int> parent;
+				q.push(s);
+				parent.push(0);
+				while(!q.empty()){
+					Squad * curr = q.front();
+					int p = parent.front();
+					was.push_back(curr);
+					q.pop();
+					parent.pop();
+					if(id == must_remove){
+						was[p]->removeSquad(curr);
+						init->addSquad(curr);
+						return true;
+					}
+					++id;
+					if(!curr->isUnit()){
+						for(auto it = curr->begin(); it != curr->end(); it++){
+							q.push(*it);
+							parent.push(id - 1);
+						}
+					}
+				}
+				return false;
+			};
+			std::vector<Squad*> check;
+			for(auto it = map->units[selectX][selectY]->begin(); it != map->units[selectX][selectY]->end(); it++)
+				check.push_back(*it);
+			for(auto s : check)
+				if(upSquad(s))
+					break;
+			check.clear();
+			if(!cleanSquad(init, nullptr))
+				map->units[selectX][selectY] = nullptr;
+			glutPostRedisplay();
+		}
+		if(key == '+'){
+			int num = atoi(userInput.c_str());
+			userInput = "";
+			if(toPush == -1){
+				toPush = num;
+				glutPostRedisplay();
+				return;
+			}
+			int id = 1;
+			Army * init = map->units[selectX][selectY];
+			Squad * toCut = nullptr, * toP = nullptr, * wP = nullptr;
+			std::vector<Squad*> was;
+			was.push_back(init);
+			auto getSquad = [&was, &id, &toPush, &num, &toCut, &toP, &wP, &init](Squad * s)->bool{
+				std::queue<Squad*> q;
+				std::queue<int> parent;
+				std::queue<bool> sub;
+				q.push(s);
+				parent.push(0);
+				sub.push(false);
+				while(!q.empty()){
+					Squad * curr = q.front();
+					int p = parent.front();
+					bool is = sub.front();
+					was.push_back(curr);
+					q.pop();
+					parent.pop();
+					sub.pop();
+					if(id == toPush){
+						is = true;
+						toCut = curr;
+						wP = was[p];
+					}
+					if(id == num){
+						if(is)
+							return false;
+						toP = curr;
+						if(toP->isUnit()){
+							Squad * pp = was[p];
+							pp->removeSquad(toP);
+							Squad * ns = new Squad(toP);
+							pp->addSquad(ns);
+							toP = ns;
+						}
+					}
+					++id;
+					if(!curr->isUnit()){
+						for(auto it = curr->begin(); it != curr->end(); it++){
+							q.push(*it);
+							parent.push(id - 1);
+							sub.push(is);
+						}
+					}
+				}
+				return true;
+			};
+			std::vector<Squad*> check;
+			for(auto it = map->units[selectX][selectY]->begin(); it != map->units[selectX][selectY]->end(); it++)
+				check.push_back(*it);
+			bool can = true;
+			for(auto s : check)
+				if(!getSquad(s)){
+					can = false;
+					break;
+				}
+			if(can){
+				wP->removeSquad(toCut);
+				toP->addSquad(toCut);
+			}
+			if(!cleanSquad(init, nullptr))
+				map->units[selectX][selectY] = nullptr;
+			toPush = -1;
+			glutPostRedisplay();
+		}
+		if(key == 8){
+			if(!userInput.empty())userInput.pop_back();
+			glutPostRedisplay();
+		}
+		return;
+	}
+	if(window->getCurrentMode() == upgrade_mode){
+		if(key == 27){
+			window->setCurrentMode(select_mode);
+			glutPostRedisplay();
+		}
+		if(key == 'a'){
+			map->units[selectX][selectY]->promote<UISStrong>();
+			window->setCurrentMode(select_mode);
+			glutPostRedisplay();
+		}
+		if(key == 'b'){
+			map->units[selectX][selectY]->promote<UISArmored>();
+			window->setCurrentMode(select_mode);
+			glutPostRedisplay();
+		}
+		return;
+	}
 	if(window->getCurrentMode() == fail_mode || window->getCurrentMode() == win_mode){
 		if(key == 27){
 			window->setCurrentMode(main_menu_mode);
@@ -514,7 +914,7 @@ void handleKey(unsigned char key, int x, int y){
 		}
 		return;
 	}
-	if(window->getCurrentMode() == hire_dir_mode || window->getCurrentMode() == tile_info_mode){
+	if(window->getCurrentMode() == hire_dir_mode || window->getCurrentMode() == tile_info_mode || window->getCurrentMode() == merge_mode || window->getCurrentMode() == split_dir_mode){
 		if(key == 27){
 			window->setCurrentMode(select_mode);
 			glutPostRedisplay();
@@ -587,7 +987,8 @@ void handleSpecialKey(int key, int x, int y){
 		if(dx == 0 && dy == 0)return;
 		if(!map->inMap(selectX + dx, selectY + dy))return;
 		if(map->units[selectX + dx][selectY + dy] != nullptr || map->bases[selectX + dx][selectY + dy] != nullptr)return;
-		moveUnit(map->units[selectX][selectY], dx, dy);
+		moveArmy(map->units[selectX][selectY], dx, dy);
+		window->setCurrentMode(select_mode);
 		glutPostRedisplay();
 		return;
 	}
@@ -600,10 +1001,43 @@ void handleSpecialKey(int key, int x, int y){
 		return;
 	}
 	if(window->getCurrentMode() == hire_dir_mode){
-		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && map->units[selectX - 1][selectY] == nullptr && map->bases[selectX - 1][selectY] == nullptr){dX = -1; dY = 0; window->setCurrentMode(hire_mode);}
-		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && map->units[selectX + 1][selectY] == nullptr && map->bases[selectX + 1][selectY] == nullptr){dX = 1; dY = 0; window->setCurrentMode(hire_mode);}
-		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && map->units[selectX][selectY - 1] == nullptr && map->bases[selectX][selectY - 1] == nullptr){dX = 0; dY = -1; window->setCurrentMode(hire_mode);}
-		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && map->units[selectX][selectY + 1] == nullptr && map->bases[selectX][selectY + 1] == nullptr){dX = 0; dY = 1; window->setCurrentMode(hire_mode);}
+		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && (map->units[selectX - 1][selectY] == nullptr || map->units[selectX - 1][selectY]->getFraction() == 0) && map->bases[selectX - 1][selectY] == nullptr){dX = -1; dY = 0; window->setCurrentMode(hire_mode);}
+		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && (map->units[selectX + 1][selectY] == nullptr || map->units[selectX + 1][selectY]->getFraction() == 0) && map->bases[selectX + 1][selectY] == nullptr){dX = 1; dY = 0; window->setCurrentMode(hire_mode);}
+		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && (map->units[selectX][selectY - 1] == nullptr || map->units[selectX][selectY - 1]->getFraction() == 0) && map->bases[selectX][selectY - 1] == nullptr){dX = 0; dY = -1; window->setCurrentMode(hire_mode);}
+		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && (map->units[selectX][selectY + 1] == nullptr || map->units[selectX][selectY + 1]->getFraction() == 0) && map->bases[selectX][selectY + 1] == nullptr){dX = 0; dY = 1; window->setCurrentMode(hire_mode);}
+		glutPostRedisplay();
+		return;
+	}
+	if(window->getCurrentMode() == split_dir_mode){
+		userInput = "";
+		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && (map->units[selectX - 1][selectY] == nullptr || map->units[selectX - 1][selectY]->getFraction() == 0) && map->bases[selectX - 1][selectY] == nullptr){dX = -1; dY = 0; toSplit.clear(); window->setCurrentMode(split_mode);}
+		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && (map->units[selectX + 1][selectY] == nullptr || map->units[selectX + 1][selectY]->getFraction() == 0) && map->bases[selectX + 1][selectY] == nullptr){dX = 1; dY = 0; toSplit.clear(); window->setCurrentMode(split_mode);}
+		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && (map->units[selectX][selectY - 1] == nullptr || map->units[selectX][selectY - 1]->getFraction() == 0) && map->bases[selectX][selectY - 1] == nullptr){dX = 0; dY = -1; toSplit.clear(); window->setCurrentMode(split_mode);}
+		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && (map->units[selectX][selectY + 1] == nullptr || map->units[selectX][selectY + 1]->getFraction() == 0) && map->bases[selectX][selectY + 1] == nullptr){dX = 0; dY = 1; toSplit.clear(); window->setCurrentMode(split_mode);}
+		glutPostRedisplay();
+		return;
+	}
+	if(window->getCurrentMode() == merge_mode){
+		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && map->units[selectX - 1][selectY] != nullptr && map->units[selectX - 1][selectY]->getFraction() == map->units[selectX][selectY]->getFraction()){
+			map->units[selectX - 1][selectY]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
+			map->units[selectX][selectY] = nullptr;
+			window->setCurrentMode(select_mode);
+		}
+		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && map->units[selectX + 1][selectY] != nullptr && map->units[selectX + 1][selectY]->getFraction() == map->units[selectX][selectY]->getFraction()){
+			map->units[selectX + 1][selectY]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
+			map->units[selectX][selectY] = nullptr;
+			window->setCurrentMode(select_mode);
+		}
+		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && map->units[selectX][selectY - 1] != nullptr && map->units[selectX][selectY - 1]->getFraction() == map->units[selectX][selectY]->getFraction()){
+			map->units[selectX][selectY - 1]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
+			map->units[selectX][selectY] = nullptr;
+			window->setCurrentMode(select_mode);
+		}
+		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && map->units[selectX][selectY + 1] != nullptr && map->units[selectX][selectY + 1]->getFraction() == map->units[selectX][selectY]->getFraction()){
+			map->units[selectX][selectY + 1]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
+			map->units[selectX][selectY] = nullptr;
+			window->setCurrentMode(select_mode);
+		}
 		glutPostRedisplay();
 		return;
 	}
