@@ -7,10 +7,10 @@ class Random{
 	public:
 	Random(int seed){base = std::mt19937(seed);}
 	Random(){base = std::mt19937(time(0));}
-	int get(){return abs(base());}
+	long long get(){return abs((long long)base());}
 	int get(int l, int r){
 		if(l > r)die("Invalid random range");
-		int x = get();
+		long long x = get();
 		x %= (r - l + 1);
 		return x + l;
 	}

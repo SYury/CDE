@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
-set(SOURCES color.cpp tiles.cpp units.cpp army.cpp map.cpp player.cpp buildings.cpp ai.cpp ui.cpp main.cpp)
+set(SOURCES color.cpp tiles.cpp units.cpp army.cpp map.cpp player.cpp buildings.cpp defender.cpp ai.cpp ui.cpp main.cpp)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -lGLEW")
 add_executable(launch ${SOURCES})
 find_package(GLUT)

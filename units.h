@@ -29,7 +29,7 @@ class Unit{
 	int gold_cost, food_cost;
 	public:
 	Unit(char _icon, std::string _name, std::vector<std::string> _description, unit_type_id _unit_type, int _fraction, int _health, int _move_pts, int _attack_range, int _low_dmg, int _high_dmg, int _gold_cost, int _food_cost):icon(_icon),name(_name),description(_description),unit_type(_unit_type),fraction(_fraction),health(_health),move_pts(_move_pts),attack_range(_attack_range),low_dmg(_low_dmg),high_dmg(_high_dmg),gold_cost(_gold_cost),food_cost(_food_cost){}
-	~Unit(){}
+	virtual ~Unit(){}
 	virtual int getTileAttackBonus(tile_id id)const = 0;
 	virtual int getTileDefenceBonus(tile_id id)const = 0;
 	virtual void restoreMP() = 0;

@@ -25,6 +25,194 @@ int toPush;
 
 const int xDelta = 9, yDelta = 15;
 
+class ModeCommand{
+protected:
+	mode_id previous;
+public:
+	virtual void execute() = 0;
+	virtual void undo(){
+		GameWindow::Instance()->setCurrentMode(previous);
+	}
+	void setPrev(mode_id mode){
+		previous = mode;
+	}
+};
+
+class ModeReceiver{
+	static std::stack<ModeCommand*> stk_;
+public:
+	static void clear(){
+		while(!stk_.empty()){
+			delete stk_.top();
+			stk_.pop();
+		}
+	}
+	static void execute(ModeCommand * cmd){
+		cmd->setPrev(GameWindow::Instance()->getCurrentMode());
+		stk_.push(cmd);
+		cmd->execute();
+	}
+	static void undo(){
+		if(stk_.empty())
+			return;
+		stk_.top()->undo();
+		delete stk_.top();
+		stk_.pop();
+	}
+	static void pop(){
+		stk_.pop();
+	}
+};
+
+std::stack<ModeCommand*> ModeReceiver::stk_;
+
+class MainMenuCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(main_menu_mode);
+	}
+};
+
+class MapViewCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(map_view_mode);
+	}
+};
+
+class SelectCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(select_mode);
+		selectX = cornerX;
+		selectY = cornerY;
+	}
+};
+
+class UnitMoveCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(unit_move_mode);
+	}
+};
+
+class UnitAttackCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(unit_attack_mode);
+		dX = dY = 0;
+	}
+};
+
+class ResizeCmd : public ModeCommand{
+	int oldCursor;
+public:
+	virtual void execute(){
+		oldCursor = menuCursor;
+		menuCursor = 0;
+		GameWindow::Instance()->setCurrentMode(resize_mode);
+	}
+	virtual void undo(){
+		menuCursor = oldCursor;
+		GameWindow::Instance()->setCurrentMode(previous);
+	}
+};
+
+class NewGameCmd : public ModeCommand{
+	int oldCursor;
+public:
+	virtual void execute(){
+		oldCursor = menuCursor;
+		menuCursor = 0;
+		GameWindow::Instance()->setCurrentMode(new_game_mode);
+	}
+	virtual void undo(){
+		menuCursor = oldCursor;
+		GameWindow::Instance()->setCurrentMode(previous);
+	}
+};
+
+class FailCmd : public ModeCommand{
+public:
+	virtual void execute(){	
+		GameWindow::Instance()->setCurrentMode(fail_mode);
+	}
+};
+
+class WinCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(win_mode);
+	}
+};
+
+class HireCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(hire_mode);
+	}
+};
+
+class HireDirCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		dX = dY = 0;
+		GameWindow::Instance()->setCurrentMode(hire_dir_mode);
+	}
+};
+
+class TileInfoCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(tile_info_mode);
+	}
+};
+
+class MergeCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(merge_mode);
+	}
+};
+
+class UpgradeCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		GameWindow::Instance()->setCurrentMode(upgrade_mode);
+	}
+};
+
+class SplitCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		toSplit.clear();
+		GameWindow::Instance()->setCurrentMode(split_mode);
+	}
+	virtual void undo(){
+		dX = dY = 0;
+		toSplit.clear();
+		userInput = "";
+		GameWindow::Instance()->setCurrentMode(previous);
+	}
+};
+
+class SplitDirCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		dX = dY = 0;
+		GameWindow::Instance()->setCurrentMode(split_mode);
+	}
+};
+
+class SquadManageCmd : public ModeCommand{
+public:
+	virtual void execute(){
+		dX = dY = 0;
+		toPush = -1;
+		GameWindow::Instance()->setCurrentMode(squad_manage_mode);
+	}
+};
+
 void reshape(int w, int h){
 	GLdouble size;
 	GLdouble aspect;
@@ -502,13 +690,11 @@ void handleKey(unsigned char key, int x, int y){
 	if(window->getCurrentMode() == main_menu_mode){
 		if(key == 13){
 			if(menuCursor == 0){
-				menuCursor = 0;
-				window->setCurrentMode(new_game_mode);
+				ModeReceiver::execute(new NewGameCmd);
 				glutPostRedisplay();
 			}
 			if(menuCursor == 2){
-				menuCursor = 0;
-				window->setCurrentMode(resize_mode);
+				ModeReceiver::execute(new ResizeCmd);
 				glutPostRedisplay();
 			}
 			if(menuCursor == 3){
@@ -537,16 +723,14 @@ void handleKey(unsigned char key, int x, int y){
 			}
 		}
 		if(key == 27){
-			menuCursor = 2;
-			window->setCurrentMode(main_menu_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		return;
 	}
 	if(window->getCurrentMode() == new_game_mode){
 		if(key == 27){
-			menuCursor = 0;
-			window->setCurrentMode(main_menu_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 13){
@@ -556,7 +740,7 @@ void handleKey(unsigned char key, int x, int y){
 				loadMap(fl);
 				fclose(fl);
 				cornerX = cornerY = 0;
-				window->setCurrentMode(map_view_mode);
+				ModeReceiver::execute(new MapViewCmd);
 			}
 			glutPostRedisplay();
 		}
@@ -564,9 +748,7 @@ void handleKey(unsigned char key, int x, int y){
 	}
 	if(window->getCurrentMode() == map_view_mode){
 		if(key == 's'){
-			window->setCurrentMode(select_mode);
-			selectX = cornerX;
-			selectY = cornerY;
+			ModeReceiver::execute(new SelectCmd);
 			glutPostRedisplay();
 		}
 		if(key == ' '){
@@ -581,39 +763,39 @@ void handleKey(unsigned char key, int x, int y){
 	}
 	if(window->getCurrentMode() == select_mode){
 		if(key == 27){
-			window->setCurrentMode(map_view_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 'm'){
-			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0)window->setCurrentMode(unit_move_mode);
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0)ModeReceiver::execute(new UnitMoveCmd);
 			glutPostRedisplay();
 		}
 		if(key == 'a'){
-			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0){dX = dY = 0; window->setCurrentMode(unit_attack_mode);}
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0)ModeReceiver::execute(new UnitAttackCmd);
 			glutPostRedisplay();
 		}
 		if(key == 'h'){
-			if(map->bases[selectX][selectY] != nullptr && map->bases[selectX][selectY]->getOwner() == 0){dX = dY = 0; window->setCurrentMode(hire_dir_mode);}
+			if(map->bases[selectX][selectY] != nullptr && map->bases[selectX][selectY]->getOwner() == 0)ModeReceiver::execute(new HireDirCmd);
 			glutPostRedisplay();
 		}
 		if(key == 'i'){
-			window->setCurrentMode(tile_info_mode);
+			ModeReceiver::execute(new TileInfoCmd);
 			glutPostRedisplay();
 		}
 		if(key == 'g'){
-			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0){window->setCurrentMode(merge_mode);}
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0)ModeReceiver::execute(new MergeCmd);
 			glutPostRedisplay();
 		}
 		if(key == 'e'){
-			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0 && canUpgrade(selectX, selectY)){window->setCurrentMode(upgrade_mode);}
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0 && canUpgrade(selectX, selectY))ModeReceiver::execute(new UpgradeCmd);
 			glutPostRedisplay();
 		}
 		if(key == 'p'){
-			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0){dX = dY = 0; window->setCurrentMode(split_dir_mode);}
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0)ModeReceiver::execute(new SplitDirCmd);
 			glutPostRedisplay();
 		}
 		if(key == 'q'){
-			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0){dX = dY = 0; toPush = -1; window->setCurrentMode(squad_manage_mode);}
+			if(map->units[selectX][selectY] != nullptr && map->units[selectX][selectY]->getFraction() == 0)ModeReceiver::execute(new SquadManageCmd);
 			glutPostRedisplay();
 		}
 		if(key == ' '){
@@ -630,59 +812,55 @@ void handleKey(unsigned char key, int x, int y){
 	}
 	if(window->getCurrentMode() == unit_move_mode){
 		if(key == 27){
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		return;
 	}
 	if(window->getCurrentMode() == unit_attack_mode){
 		if(key == 27){
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 13){
 			if(map->units[selectX + dX][selectY + dY] == nullptr && map->bases[selectX + dX][selectY + dY] == nullptr)return;
 			if(map->units[selectX + dX][selectY + dY] != nullptr)attackArmy(map->units[selectX][selectY], map->units[selectX + dX][selectY + dY]);
 			else attackBase(map->units[selectX][selectY], map->bases[selectX + dX][selectY + dY]);
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		return;
 	}
 	if(window->getCurrentMode() == hire_mode){
 		if(key == 27){
-			window->setCurrentMode(hire_dir_mode);
-			dX = dY = 0;
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 'a'){
 			map->bases[selectX][selectY]->hireUnit(player[0].factory->getInfantry(0), dX, dY);
-			window->setCurrentMode(map_view_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 'b'){
 			map->bases[selectX][selectY]->hireUnit(player[0].factory->getCavalry(0), dX, dY);
-			window->setCurrentMode(map_view_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 'c'){
 			map->bases[selectX][selectY]->hireUnit(player[0].factory->getRanged(0), dX, dY);
-			window->setCurrentMode(map_view_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 'd'){
 			map->bases[selectX][selectY]->hireUnit(player[0].factory->getHeavy(0), dX, dY);
-			window->setCurrentMode(map_view_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		return;
 	}
 	if(window->getCurrentMode() == split_mode){
 		if(key == 27){
-			window->setCurrentMode(split_dir_mode);
-			dX = dY = 0;
-			toSplit.clear();
-			userInput = "";
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key >= '0' && key <= '9'){
@@ -747,7 +925,8 @@ void handleKey(unsigned char key, int x, int y){
 			}
 			if(!cleanSquad(init, nullptr))
 				map->units[selectX][selectY] = nullptr;
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 8){
@@ -758,8 +937,8 @@ void handleKey(unsigned char key, int x, int y){
 	}
 	if(window->getCurrentMode() == squad_manage_mode){
 		if(key == 27){
-			window->setCurrentMode(select_mode);
 			userInput = "";
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key >= '0' && key <= '9'){
@@ -892,31 +1071,32 @@ void handleKey(unsigned char key, int x, int y){
 	}
 	if(window->getCurrentMode() == upgrade_mode){
 		if(key == 27){
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 'a'){
 			map->units[selectX][selectY]->promote<UISStrong>();
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		if(key == 'b'){
 			map->units[selectX][selectY]->promote<UISArmored>();
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		return;
 	}
 	if(window->getCurrentMode() == fail_mode || window->getCurrentMode() == win_mode){
 		if(key == 27){
-			window->setCurrentMode(main_menu_mode);
+			ModeReceiver::clear();
+			ModeReceiver::execute(new MainMenuCmd);
 			glutPostRedisplay();
 		}
 		return;
 	}
 	if(window->getCurrentMode() == hire_dir_mode || window->getCurrentMode() == tile_info_mode || window->getCurrentMode() == merge_mode || window->getCurrentMode() == split_dir_mode){
 		if(key == 27){
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 			glutPostRedisplay();
 		}
 		return;
@@ -988,7 +1168,7 @@ void handleSpecialKey(int key, int x, int y){
 		if(!map->inMap(selectX + dx, selectY + dy))return;
 		if(map->units[selectX + dx][selectY + dy] != nullptr || map->bases[selectX + dx][selectY + dy] != nullptr)return;
 		moveArmy(map->units[selectX][selectY], dx, dy);
-		window->setCurrentMode(select_mode);
+		ModeReceiver::undo();
 		glutPostRedisplay();
 		return;
 	}
@@ -1001,19 +1181,19 @@ void handleSpecialKey(int key, int x, int y){
 		return;
 	}
 	if(window->getCurrentMode() == hire_dir_mode){
-		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && (map->units[selectX - 1][selectY] == nullptr || map->units[selectX - 1][selectY]->getFraction() == 0) && map->bases[selectX - 1][selectY] == nullptr){dX = -1; dY = 0; window->setCurrentMode(hire_mode);}
-		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && (map->units[selectX + 1][selectY] == nullptr || map->units[selectX + 1][selectY]->getFraction() == 0) && map->bases[selectX + 1][selectY] == nullptr){dX = 1; dY = 0; window->setCurrentMode(hire_mode);}
-		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && (map->units[selectX][selectY - 1] == nullptr || map->units[selectX][selectY - 1]->getFraction() == 0) && map->bases[selectX][selectY - 1] == nullptr){dX = 0; dY = -1; window->setCurrentMode(hire_mode);}
-		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && (map->units[selectX][selectY + 1] == nullptr || map->units[selectX][selectY + 1]->getFraction() == 0) && map->bases[selectX][selectY + 1] == nullptr){dX = 0; dY = 1; window->setCurrentMode(hire_mode);}
+		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && (map->units[selectX - 1][selectY] == nullptr || map->units[selectX - 1][selectY]->getFraction() == 0) && map->bases[selectX - 1][selectY] == nullptr){dX = -1; dY = 0; ModeReceiver::execute(new HireCmd);}
+		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && (map->units[selectX + 1][selectY] == nullptr || map->units[selectX + 1][selectY]->getFraction() == 0) && map->bases[selectX + 1][selectY] == nullptr){dX = 1; dY = 0; ModeReceiver::execute(new HireCmd);}
+		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && (map->units[selectX][selectY - 1] == nullptr || map->units[selectX][selectY - 1]->getFraction() == 0) && map->bases[selectX][selectY - 1] == nullptr){dX = 0; dY = -1; ModeReceiver::execute(new HireCmd);}
+		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && (map->units[selectX][selectY + 1] == nullptr || map->units[selectX][selectY + 1]->getFraction() == 0) && map->bases[selectX][selectY + 1] == nullptr){dX = 0; dY = 1; ModeReceiver::execute(new HireCmd);}
 		glutPostRedisplay();
 		return;
 	}
 	if(window->getCurrentMode() == split_dir_mode){
 		userInput = "";
-		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && (map->units[selectX - 1][selectY] == nullptr || map->units[selectX - 1][selectY]->getFraction() == 0) && map->bases[selectX - 1][selectY] == nullptr){dX = -1; dY = 0; toSplit.clear(); window->setCurrentMode(split_mode);}
-		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && (map->units[selectX + 1][selectY] == nullptr || map->units[selectX + 1][selectY]->getFraction() == 0) && map->bases[selectX + 1][selectY] == nullptr){dX = 1; dY = 0; toSplit.clear(); window->setCurrentMode(split_mode);}
-		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && (map->units[selectX][selectY - 1] == nullptr || map->units[selectX][selectY - 1]->getFraction() == 0) && map->bases[selectX][selectY - 1] == nullptr){dX = 0; dY = -1; toSplit.clear(); window->setCurrentMode(split_mode);}
-		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && (map->units[selectX][selectY + 1] == nullptr || map->units[selectX][selectY + 1]->getFraction() == 0) && map->bases[selectX][selectY + 1] == nullptr){dX = 0; dY = 1; toSplit.clear(); window->setCurrentMode(split_mode);}
+		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && (map->units[selectX - 1][selectY] == nullptr || map->units[selectX - 1][selectY]->getFraction() == 0) && map->bases[selectX - 1][selectY] == nullptr){dX = -1; dY = 0; ModeReceiver::execute(new SplitCmd);}
+		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && (map->units[selectX + 1][selectY] == nullptr || map->units[selectX + 1][selectY]->getFraction() == 0) && map->bases[selectX + 1][selectY] == nullptr){dX = 1; dY = 0; ModeReceiver::execute(new SplitCmd);}
+		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && (map->units[selectX][selectY - 1] == nullptr || map->units[selectX][selectY - 1]->getFraction() == 0) && map->bases[selectX][selectY - 1] == nullptr){dX = 0; dY = -1; ModeReceiver::execute(new SplitCmd);}
+		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && (map->units[selectX][selectY + 1] == nullptr || map->units[selectX][selectY + 1]->getFraction() == 0) && map->bases[selectX][selectY + 1] == nullptr){dX = 0; dY = 1; ModeReceiver::execute(new SplitCmd);}
 		glutPostRedisplay();
 		return;
 	}
@@ -1021,22 +1201,22 @@ void handleSpecialKey(int key, int x, int y){
 		if(key == GLUT_KEY_UP && map->inMap(selectX - 1, selectY) && map->units[selectX - 1][selectY] != nullptr && map->units[selectX - 1][selectY]->getFraction() == map->units[selectX][selectY]->getFraction()){
 			map->units[selectX - 1][selectY]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
 			map->units[selectX][selectY] = nullptr;
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 		}
 		if(key == GLUT_KEY_DOWN && map->inMap(selectX + 1, selectY) && map->units[selectX + 1][selectY] != nullptr && map->units[selectX + 1][selectY]->getFraction() == map->units[selectX][selectY]->getFraction()){
 			map->units[selectX + 1][selectY]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
 			map->units[selectX][selectY] = nullptr;
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 		}
 		if(key == GLUT_KEY_LEFT && map->inMap(selectX, selectY - 1) && map->units[selectX][selectY - 1] != nullptr && map->units[selectX][selectY - 1]->getFraction() == map->units[selectX][selectY]->getFraction()){
 			map->units[selectX][selectY - 1]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
 			map->units[selectX][selectY] = nullptr;
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 		}
 		if(key == GLUT_KEY_RIGHT && map->inMap(selectX, selectY + 1) && map->units[selectX][selectY + 1] != nullptr && map->units[selectX][selectY + 1]->getFraction() == map->units[selectX][selectY]->getFraction()){
 			map->units[selectX][selectY + 1]->addSquad(dynamic_cast<Squad*>(map->units[selectX][selectY]));
 			map->units[selectX][selectY] = nullptr;
-			window->setCurrentMode(select_mode);
+			ModeReceiver::undo();
 		}
 		glutPostRedisplay();
 		return;

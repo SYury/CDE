@@ -29,3 +29,20 @@ Army * Base::hireUnit(Unit * who, int dx, int dy)const{
 	res->setY(y + dy);
 	return res;
 }
+
+bool Base::defend(int dmg, tile_id id){
+	addHp(-dmg);
+	if(getHp() <= 0){
+		onDeath();
+		return false;
+	}
+	return true;
+}
+
+void Base::onDeath()const{
+	int who = getOwner();
+	if(who != -1){
+		player[who].bases--;
+		if(player[who].bases == 0)player[who].lost = true;
+	}
+}

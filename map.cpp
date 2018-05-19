@@ -1,5 +1,6 @@
 #include "map.h"
 #include "random.h"
+#include "defender.h"
 
 void loadMap(FILE * fl){
 	//TODO: this must be rewritten
@@ -111,7 +112,7 @@ void attackArmy(Army * atk, Army * def){
 	if(atk->getFraction() == def->getFraction())
 		return;
 	int dmg = atk->attack(map->tiles[atk->getX()][atk->getY()].getId());
-	if(!def->defend(dmg, map->tiles[def->getX()][def->getY()].getId())){
+	if(!Defender(dmg, map->tiles[def->getX()][def->getY()].getId()).defend(*def)){
 		map->units[def->getX()][def->getY()] = nullptr;
 		delete def;
 	}
@@ -125,13 +126,7 @@ void attackBase(Army * atk, Base * def){
 	int dmg = atk->attack(map->tiles[atk->getX()][atk->getY()].getId());
 	double raw_dmg = dmg/double(dbonus);
 	dmg = (int)(round(raw_dmg) + 1e-8);
-	def->addHp(-dmg);
-	if(def->getHp() <= 0){
-		int who = def->getOwner();
-		if(who != -1){
-			player[who].bases--;
-			if(player[who].bases == 0)player[who].lost = true;
-		}
+	if(!Defender(dmg, map->tiles[def->getX()][def->getY()].getId()).defend(*def)){
 		map->bases[def->getX()][def->getY()] = nullptr;
 		delete def;
 	}

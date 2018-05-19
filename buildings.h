@@ -29,6 +29,8 @@ class Base : public Building{
 	void setHp(int val){hp = val;}
 	char getIcon()const{return 'B';}
 	Army * hireUnit(Unit * who, int dx, int dy)const;
+	bool defend(int dmg, tile_id id);
+	void onDeath()const;
 };
 
 class Village : public Building{

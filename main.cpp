@@ -16,6 +16,7 @@ int main(int argc, char ** argv){
 	window->setWindowH(780);
 	window->setMapW(30);
 	window->setMapH(30);
+	window->setCurrentMode(main_menu_mode);
 	player[0].human = true;
 	glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB);
